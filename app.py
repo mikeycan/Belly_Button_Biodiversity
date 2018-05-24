@@ -21,41 +21,38 @@ app = Flask(__name__)
 from flask_sqlalchemy import SQLAlchemy
 
 # Database Setup
+app.config['SQLALCHEMY_DATABASE_URI'] = "sqlite:///DataSets/belly_button_biodiversity.sqlite"
 
-engine = create_engine(os.path.join("sqlite:///","DataSets","belly_button_biodiversity.sqlite"),echo=False)
-
-conn = engine.connect()
+engine= create_engine("sqlite:///DataSets/belly_button_biodiversity.sqlite")
 Base = automap_base()
-# Use the Base class to reflect the database tables
-Base.prepare(engine, reflect=True)
-# Print all of the classes mapped to the Base
-Base.classes.keys()
-otu_db = Base.classes.otu
-samples_db = Base.classes.samples
-samples_meta_db = Base.classes.samples_metadata
+Base.prepare(engine, reflect = True )
+
+Samples = Base.classes.samples
+Otu = Base.classes.otu
+samples_Metadata = Base.classes.samples_metadata
+
 session = Session(engine)
 
 
 @app.route("/")
 def home():
-    
-    data=Base.classes.samples.__table__.columns.keys()
-    d=data[1:]
-    return render_template("index.html",sample_drop=d)
+    return render_template("index.html")
 
 
 @app.route('/names')
-def ret_names():
-    samples_cols_list=Base.classes.samples.__table__.columns.keys()
-    #remove 1at element otu_id
-    return jsonify(samples_cols_list[1:])
+def names():
+    stmt = session.query(Samples).statement
+    df=pd.read_sql_query(stmt, session.bind)
+    df.set_index('otu_id', inplace=True)
+    return jsonify(list(df.columns))
 
 @app.route('/otu')
 def otu():
-    result_taxonomy = session.query(otu_db.lowest_taxonomic_unit_found).all()
-    #to create one list of all descriptions
-    taxonomy = [i[0] for i in result_taxonomy]
-    return jsonify(taxonomy)
+    # stmt2 = session.query(Samples).statement
+    # df=pd.read_sql_query(stmt2, session.bind)
+    # df.set_index('otu_id', inplace=True)
+    results = session.query(Otu.lowest_taxonomic_unit_found).all()
+    return jsonify(results)
     
     
 
@@ -98,7 +95,6 @@ def samp_samples(sample):
     sample_otu_list=[]
     sample_otu_list.append(sample_otu_dict)
     return jsonify(sample_otu_list)
-
 
 
 if __name__ == '__main__':
